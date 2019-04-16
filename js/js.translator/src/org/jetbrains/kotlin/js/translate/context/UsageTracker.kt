@@ -71,7 +71,8 @@ class UsageTracker(
     private fun captureIfNeed(descriptor: DeclarationDescriptor?) {
         if (descriptor == null || isCaptured(descriptor) || !isInLocalDeclaration() ||
             isAncestor(containingDescriptor, descriptor, /* strict = */ true) ||
-            isReceiverAncestor(descriptor) || isSingletonReceiver(descriptor)
+            isReceiverAncestor(descriptor) || isSingletonReceiver(descriptor) ||
+            isOuterValueParameter(descriptor)
         ) {
             return
         }
@@ -91,6 +92,10 @@ class UsageTracker(
     private fun isInLocalDeclaration(): Boolean {
         val container = containingDescriptor
         return isDescriptorWithLocalVisibility(if (container is ConstructorDescriptor) container.containingDeclaration else container)
+    }
+
+    private fun isOuterValueParameter(declarationDescriptor: DeclarationDescriptor): Boolean {
+        return declarationDescriptor is ValueParameterDescriptor && !isAncestor(declarationDescriptor.containingDeclaration, containingDescriptor, false)
     }
 
     /**

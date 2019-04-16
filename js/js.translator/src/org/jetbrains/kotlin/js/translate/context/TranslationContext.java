@@ -85,7 +85,7 @@ public class TranslationContext {
         DynamicContext rootDynamicContext = DynamicContext.rootContext(
                 staticContext.getFragment().getScope(), staticContext.getFragment().getInitializerBlock());
         AliasingContext rootAliasingContext = AliasingContext.getCleanContext();
-        return new TranslationContext(null, staticContext, rootDynamicContext, rootAliasingContext, null, null);
+        return new TranslationContext(null, staticContext, rootDynamicContext, rootAliasingContext, null, null, null);
     }
 
     private final Map<JsExpression, TemporaryConstVariable> expressionToTempConstVariableCache = new HashMap<>();
@@ -96,7 +96,8 @@ public class TranslationContext {
             @NotNull DynamicContext dynamicContext,
             @NotNull AliasingContext aliasingContext,
             @Nullable UsageTracker usageTracker,
-            @Nullable DeclarationDescriptor declarationDescriptor
+            @Nullable DeclarationDescriptor declarationDescriptor,
+            @Nullable ValueParameterDescriptor continuationParameterDescriptor
     ) {
         this.parent = parent;
         this.dynamicContext = dynamicContext;
@@ -111,7 +112,7 @@ public class TranslationContext {
             this.classDescriptor = parent != null ? parent.classDescriptor : null;
         }
 
-        continuationParameterDescriptor = calculateContinuationParameter();
+        this.continuationParameterDescriptor = continuationParameterDescriptor != null ? continuationParameterDescriptor : calculateContinuationParameter();
         inlineFunctionContext = parent != null ? parent.inlineFunctionContext : null;
 
         DeclarationDescriptor parentDescriptor = parent != null ? parent.declarationDescriptor : null;
@@ -173,31 +174,31 @@ public class TranslationContext {
             aliasingContext = this.aliasingContext.inner();
         }
 
-        return new TranslationContext(this, this.staticContext, dynamicContext, aliasingContext, this.usageTracker, descriptor);
+        return new TranslationContext(this, this.staticContext, dynamicContext, aliasingContext, this.usageTracker, descriptor, null);
     }
 
     @NotNull
     public TranslationContext newFunctionBodyWithUsageTracker(@NotNull JsFunction fun, @NotNull MemberDescriptor descriptor) {
         DynamicContext dynamicContext = DynamicContext.newContext(fun.getScope(), fun.getBody());
         UsageTracker usageTracker = new UsageTracker(this.usageTracker, descriptor);
-        return new TranslationContext(this, this.staticContext, dynamicContext, this.aliasingContext.inner(), usageTracker, descriptor);
+        return new TranslationContext(this, this.staticContext, dynamicContext, this.aliasingContext.inner(), usageTracker, descriptor, null);
     }
 
     @NotNull
     public TranslationContext innerWithUsageTracker(@NotNull MemberDescriptor descriptor) {
         UsageTracker usageTracker = new UsageTracker(this.usageTracker, descriptor);
-        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext.inner(), usageTracker, descriptor);
+        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext.inner(), usageTracker, descriptor, null);
     }
 
     @NotNull
     public TranslationContext inner(@NotNull MemberDescriptor descriptor) {
-        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext.inner(), usageTracker, descriptor);
+        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext.inner(), usageTracker, descriptor, null);
     }
 
     @NotNull
     public TranslationContext innerBlock(@NotNull JsBlock block) {
         return new TranslationContext(this, staticContext, dynamicContext.innerBlock(block), aliasingContext, usageTracker,
-                                      this.declarationDescriptor);
+                                      this.declarationDescriptor, null);
     }
 
     @NotNull
@@ -212,12 +213,18 @@ public class TranslationContext {
             innerBlock = dynamicContext.jsBlock();
         }
         DynamicContext dynamicContext = DynamicContext.newContext(getScopeForDescriptor(descriptor), innerBlock);
-        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext, usageTracker, descriptor);
+        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext, usageTracker, descriptor, null);
     }
 
     @NotNull
     private TranslationContext innerWithAliasingContext(AliasingContext aliasingContext) {
-        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext, usageTracker, declarationDescriptor);
+        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext, usageTracker, declarationDescriptor, null);
+    }
+
+    @NotNull // Needed for callable reference translation
+    public TranslationContext withExplicitContinuationParameterDescriptor(@Nullable ValueParameterDescriptor continuationParameterDescriptor) {
+        if (continuationParameterDescriptor == null) return this;
+        return new TranslationContext(this, staticContext, dynamicContext, aliasingContext, usageTracker, declarationDescriptor, continuationParameterDescriptor);
     }
 
     @NotNull
